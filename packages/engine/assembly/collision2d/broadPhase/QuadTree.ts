@@ -17,7 +17,6 @@ export class Quadtree {
     }
 
     public insert(id: i32, rect: Rect): void {
-        // Si ya hay subdivisiones, delegar a los hijos que intersecten
         if (this.children) {
             for (let i = 0; i < 4; i++) {
                 if ((this.children as Quadtree[])[i].bounds.intersects(rect)) {
@@ -27,13 +26,11 @@ export class Quadtree {
             return;
         }
 
-        // Agregar el rect al nodo actual
         this.rects.set(id, rect);
 
-        // Si excede el máximo de rects y la profundidad permite, subdividir
         if (this.rects.size > Quadtree.MAX_RECTS && this.depth < Quadtree.MAX_DEPTH) {
             this.subdivide();
-            // Redistribuir rects a los hijos relevantes
+
             const keys = this.rects.keys();
             const values = this.rects.values();
             for (let i = 0; i < keys.length; i++) {
@@ -69,7 +66,6 @@ export class Quadtree {
     }
 
     private retrieveFromNode(rect: Rect, result: i32[]): void {
-        // Añadir los rectángulos del nodo actual que intersectan con el rect
         const keys = this.rects.keys();
         const values = this.rects.values();
         for (let i = 0; i < keys.length; i++) {
@@ -80,7 +76,6 @@ export class Quadtree {
             }
         }
 
-        // Si hay hijos, explorar solo los que intersecten con el rect
         if (this.children) {
             for (let i = 0; i < 4; i++) {
                 if ((this.children as Quadtree[])[i].bounds.intersects(rect)) {
@@ -91,7 +86,6 @@ export class Quadtree {
     }
 
     private subdivide(): void {
-        //const { x, y, width, height } = this.bounds;
         const x = this.bounds.x;
         const y = this.bounds.y;
         const width = this.bounds.width;
