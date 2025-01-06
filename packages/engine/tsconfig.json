@@ -1,0 +1,10 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "declarationDir": "../lib/types",
+        "rootDir": "src"
+    },
+    "include": ["src", "types"],
+    "exclude": ["node_modules", "assembly"]
+}

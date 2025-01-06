@@ -1,0 +1,24 @@
+{
+    "name": "wasm-poc-monorepo",
+    "version": "1.0.0",
+    "license": "MIT",
+    "private": true,
+    "author": "Mauro Cristy <maurocristy@gmail.com>",
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "start": "yarn workspace @wasm-poc/test start",
+        "build:ts": "yarn workspace @wasm-poc/engine build",
+        "build:as": "yarn workspace @wasm-poc/engine asbuild",
+        "build:all": "yarn build:as && yarn build:ts",
+        "lint": "eslint ."
+    },
+    "devDependencies": {
+        "assemblyscript": "^0.27.31",
+        "eslint": "^9.17.0",
+        "prettier": "^3.4.2",
+        "typescript": "^5.7.2",
+        "typescript-eslint": "^8.19.0"
+    }
+}

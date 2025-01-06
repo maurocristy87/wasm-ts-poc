@@ -1,0 +1,7 @@
+**/node_modules
+.vscode
+.vs
+**/lib/*
+!**/lib/package.json
+**/yarn-error.log
+**/wasm/*
