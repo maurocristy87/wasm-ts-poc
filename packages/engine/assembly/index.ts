@@ -1,33 +1,53 @@
 import { Quadtree } from "./collision2d/broadPhase/QuadTree";
+import {
+    calculateBoundingBoxFromCircumference,
+    calculateBoundingBoxFromVertices,
+    calculateNormals,
+} from "./math/Utils";
 import { Rect } from "./math/Rect";
 
-const rects: Map<i32, Rect> = new Map<i32, Rect>();
+// shapes
+const shapeIds: Set<i32> = new Set<i32>();
+const boundingBoxes: Map<i32, Rect> = new Map<i32, Rect>();
+const vertices: Map<i32, Float64Array> = new Map<i32, Float64Array>();
+const circumferences: Map<i32, Float64Array> = new Map<i32, Float64Array>(); // id -> [x, y, radius]
+const normals: Map<i32, Float64Array> = new Map<i32, Float64Array>();
+
+// broad phase
 const bounds: Rect = new Rect(0, 0, 0, 0);
 const quadtree: Quadtree = new Quadtree(bounds);
-const rectsToInsert: Set<i32> = new Set<i32>();
+
 let neighbors: i32[] = [];
 
-export function insertRect(id: i32, x: f64, y: f64, width: f64, height: f64): void {
-    if (!rects.has(id)) rects.set(id, new Rect(x, y, width, height));
+export function insertShape(id: i32, pointer: usize, length: i32, circumference: boolean = false): void {
+    if (!boundingBoxes.has(id)) boundingBoxes.set(id, new Rect(0, 0, 0, 0));
 
-    const rect = rects.get(id);
-    rect.set(x, y, width, height);
+    const data = Float64Array.wrap(changetype<ArrayBuffer>(pointer), 0, length);
 
-    rectsToInsert.add(id);
+    if (circumference) {
+        calculateBoundingBoxFromCircumference(boundingBoxes.get(id), data);
+        circumferences.set(id, data);
+    } else {
+        calculateBoundingBoxFromVertices(boundingBoxes.get(id), data);
+        vertices.set(id, data);
+        normals.set(id, calculateNormals(data));
+    }
+
+    shapeIds.add(id);
 }
 
 export function updateBroadPhase(): void {
-    if (rectsToInsert.size === 0) return;
+    if (shapeIds.size === 0) return;
 
     let minX: f64 = Infinity;
     let minY: f64 = Infinity;
     let maxX: f64 = -Infinity;
     let maxY: f64 = -Infinity;
 
-    const ids = rectsToInsert.values();
+    const ids = shapeIds.values();
 
     for (let i = 0; i < ids.length; i++) {
-        const rect = rects.get(ids[i]);
+        const rect = boundingBoxes.get(ids[i]);
         if (!rect) continue;
 
         if (rect.x < minX) minX = rect.x;
@@ -40,15 +60,16 @@ export function updateBroadPhase(): void {
     quadtree.clear(bounds);
 
     for (let i = 0; i < ids.length; i++) {
+        if (!boundingBoxes.has(ids[i])) continue;
         const id = ids[i];
-        quadtree.insert(id, rects.get(id));
+        quadtree.insert(id, boundingBoxes.get(id));
     }
 
-    rectsToInsert.clear();
+    shapeIds.clear();
 }
 
 export function retrieveNeighbors(id: i32): usize {
-    neighbors = quadtree.retrieve(rects.get(id));
+    neighbors = quadtree.retrieve(boundingBoxes.get(id));
     const result = new Int32Array(neighbors.length);
 
     for (let i = 0; i < neighbors.length; i++) {
