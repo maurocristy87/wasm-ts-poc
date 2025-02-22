@@ -26,7 +26,6 @@ export class Quadtree implements BroadPhase {
             for (let i = 0; i < 4; i++) {
                 (this.children as Quadtree[])[i].clear();
             }
-            this.children = null;
         }
     }
 
@@ -35,13 +34,11 @@ export class Quadtree implements BroadPhase {
             this.subdivide();
 
             const keys = this.rects.keys();
-            const values = this.rects.values();
             for (let i = 0; i < keys.length; i++) {
                 const key = keys[i];
-                const value = values[i];
                 for (let j = 0; j < 4; j++) {
-                    if (this.children![j].bounds.intersects(value)) {
-                        this.children![j].insert(key, value);
+                    if (this.children![j].bounds.intersects(this.rects.get(key))) {
+                        this.children![j].insert(key, this.rects.get(key));
                     }
                 }
             }
@@ -76,13 +73,13 @@ export class Quadtree implements BroadPhase {
         ];
     }
 
-    public retrieve(rect: Rect): i32[] {
-        const neighbors: i32[] = [];
+    public retrieve(rect: Rect, neighbors: Set<i32>): Set<i32> {
+        neighbors.clear();
         this.retrieveFromNode(rect, neighbors);
         return neighbors;
     }
 
-    private retrieveFromNode(rect: Rect, result: i32[]): void {
+    private retrieveFromNode(rect: Rect, result: Set<i32>): void {
         if (this.children) {
             for (let i = 0; i < 4; i++) {
                 if ((this.children as Quadtree[])[i].bounds.intersects(rect)) {
@@ -91,12 +88,9 @@ export class Quadtree implements BroadPhase {
             }
         } else {
             const keys = this.rects.keys();
-            const values = this.rects.values();
             for (let i = 0; i < keys.length; i++) {
-                const id = keys[i];
-                const currentRect = values[i];
-                if (currentRect.intersects(rect) && result.indexOf(id) === -1) {
-                    result.push(id);
+                if (this.rects.get(keys[i]).intersects(rect)) {
+                    result.add(keys[i]);
                 }
             }
         }

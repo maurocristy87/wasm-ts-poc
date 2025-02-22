@@ -7,6 +7,9 @@ import {
 import { Rect } from "./math/Rect";
 import { Sat } from "./collision2d/narrowPhase/Sat";
 
+// @external("env", "logMemoryStatus")
+// declare function logMemoryStatus(ptr: usize, memorySize: i32): void;
+
 // shapes
 const shapeIds: Set<i32> = new Set<i32>();
 const boundingBoxes: Map<i32, Rect> = new Map<i32, Rect>();
@@ -17,10 +20,12 @@ const normals: Map<i32, Float64Array> = new Map<i32, Float64Array>();
 // broad phase
 const bounds: Rect = new Rect(0, 0, 0, 0);
 const quadtree: Quadtree = new Quadtree(bounds);
-let neighbors: i32[] = [];
+let neighbors: Set<i32> = new Set<i32>();
+let neighborsBuffer: Int32Array = new Int32Array(100); // 100 as a starter size
 
 // narrow phase
 const sat = new Sat();
+let collisionResult: Float64Array = new Float64Array(3);
 
 export function insertShape(id: i32, pointer: usize, length: i32, circumference: i32): void {
     if (!boundingBoxes.has(id)) boundingBoxes.set(id, new Rect(0, 0, 0, 0));
@@ -67,32 +72,48 @@ export function updateBroadPhase(): void {
         const id = ids[i];
         quadtree.insert(id, boundingBoxes.get(id));
     }
-
-    shapeIds.clear();
 }
 
 export function retrieveNeighbors(id: i32): usize {
-    neighbors = quadtree.retrieve(boundingBoxes.get(id));
-    const result = new Int32Array(neighbors.length);
+    quadtree.retrieve(boundingBoxes.get(id), neighbors);
 
-    for (let i = 0; i < neighbors.length; i++) {
-        result[i] = neighbors[i];
+    if (neighbors.size > neighborsBuffer.length) {
+        neighborsBuffer = new Int32Array(neighbors.size);
     }
 
-    return result.dataStart;
+    for (let i = 0; i < neighbors.size; i++) {
+        neighborsBuffer[i] = neighbors.values()[i];
+    }
+
+    return neighborsBuffer.dataStart;
 }
 
 export function getNeighborsLength(): i32 {
-    return neighbors.length;
+    return neighbors.size;
 }
 
 export function getCollisionResult(shapeId: i32, neighborId: i32): usize {
-    const result = sat.resolveForPolygons(
+    sat.resolveForPolygons(
         vertices.get(shapeId),
         normals.get(shapeId),
         vertices.get(neighborId),
         normals.get(neighborId),
+        collisionResult,
     );
 
-    return result.dataStart;
+    return collisionResult.dataStart;
+}
+
+export function resetMemory(): void {
+    // shapes
+    shapeIds.clear();
+    boundingBoxes.clear();
+    vertices.clear();
+    circumferences.clear();
+    normals.clear();
+
+    // broad phase
+    quadtree.clear(null);
+    neighbors.clear();
+    neighborsBuffer = new Int32Array(100);
 }

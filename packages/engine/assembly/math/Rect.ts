@@ -30,4 +30,11 @@ export class Rect {
             this.y + this.height >= other.y + other.height
         );
     }
+
+    copy(rect: Rect): void {
+        this.x = rect.x;
+        this.y = rect.y;
+        this.width = rect.width;
+        this.height = rect.height;
+    }
 }

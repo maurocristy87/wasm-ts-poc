@@ -1,13 +1,14 @@
-import { memory } from "./wasm/debug";
-import release from "./wasm/debug.wasm";
+import { memory } from "./wasm/release";
+import release from "./wasm/release.wasm";
 
+// types
 type WasmModuleExprts = {
     insertShape(id: number, pointer: number, length: number, circumference: number): void;
     updateBroadPhase(): void;
     retrieveNeighbors(id: number): number;
     getNeighborsLength(): number;
     getCollisionResult(shapeId: number, neighborId: number): number;
-    resetMemory(): void;
+    clear(): void;
     memory: WebAssembly.Memory;
     __new(size: number, id: number): number;
     __pin(ptr: number): number;
@@ -24,10 +25,8 @@ type Shape = {
     hasCollision?: boolean;
 };
 
-const shapes: Shape[] = [];
-const shapePointers = new Map<number, number>(); // shapeId -> pointer
-
-export async function run(shapesNumber: number, render: boolean = true) {
+// logic
+export async function run(shapeNumber: number, render: boolean = true) {
     const canvas = document.createElement("canvas");
     canvas.width = 1920;
     canvas.height = 1080;
@@ -38,7 +37,12 @@ export async function run(shapesNumber: number, render: boolean = true) {
 
     const wasm = await loadWasm();
 
-    gameLoop(shapesNumber, render && canvas, wasm);
+    // state
+    const shapes: Shape[] = [];
+    const shapePointers = new Map<number, number>(); // shapeId -> pointer
+
+    createShapes(shapeNumber, wasm, shapes, shapePointers);
+    gameLoop(shapeNumber, render && canvas, wasm, shapes, shapePointers);
 }
 
 const loadWasm = async () => {
@@ -57,68 +61,29 @@ const loadWasm = async () => {
     return instance.exports as WasmModuleExprts;
 };
 
-const createShapes = (shapesNumber: number, wasm: WasmModuleExprts): void => {
-    for (let i = 0; i < shapesNumber; i++) {
+const createShapes = (
+    shapeNumber: number,
+    wasm: WasmModuleExprts,
+    shapes: Shape[],
+    shapePointers: Map<number, number>,
+): void => {
+    for (let i = 0; i < shapeNumber; i++) {
         const polygon = generateRandomPolygon();
-
         polygon.id = i;
         shapes.push(polygon);
 
-        const { vertices } = polygon;
-        const { insertShape, __new, memory } = wasm;
-        const ptr = __new(vertices.length * 8, 3); // `3` is the id for Float64Array
+        const { vertices, boundingBox } = polygon;
+        const ptr = wasm.__new(vertices.length * 8, 3); // `3` is the id for Float64Array
         new Float64Array(memory.buffer, ptr, vertices.length).set(vertices);
 
         shapePointers.set(i, ptr);
 
-        console.log("Inserting shape", i, ptr);
-        insertShape(i, ptr, vertices.length, 0);
+        // console.log("Inserting shape", i, ptr, vertices.length, vertices, boundingBox);
+        wasm.insertShape(i, ptr, vertices.length, 0);
     }
 };
 
-function gameLoop(shapesNumber: number, canvas: HTMLCanvasElement, wasm: WasmModuleExprts) {
-    const { updateBroadPhase, retrieveNeighbors, getNeighborsLength, getCollisionResult, resetMemory, memory } = wasm;
-
-    shapes.length = 0;
-    createShapes(shapesNumber, wasm);
-
-    updateBroadPhase();
-
-    for (let i = 0; i < shapesNumber; i++) {
-        continue;
-
-        const neighborsPointer = retrieveNeighbors(i);
-        const neighborsLength = getNeighborsLength();
-        const neighbors = new Int32Array(memory.buffer, neighborsPointer, neighborsLength);
-
-        // console.log(`Neighbors for ${i}:`, Array.from(neighbors));
-        console.log(neighborsPointer);
-
-        for (let j = 0; j < neighborsLength; j++) {
-            const neighborId = neighbors[j];
-            if (i === neighborId) continue;
-
-            const collisionResultPointer = getCollisionResult(i, neighborId);
-            const collisionResult = new Float64Array(memory.buffer, collisionResultPointer, 3);
-
-            if (collisionResult[2] !== Infinity) {
-                shapes[i].hasCollision = true;
-                shapes[neighborId].hasCollision = true;
-                console.log(
-                    `Collision between ${i} and ${neighborId}: direction (${collisionResult[0]}, ${collisionResult[1]}), penetration: ${collisionResult[2]}`,
-                );
-            }
-        }
-    }
-
-    resetMemory();
-
-    if (canvas) renderPolygons(canvas, shapes);
-
-    window.requestAnimationFrame(() => gameLoop(shapesNumber, canvas, wasm));
-}
-
-function generateRandomPolygon(): Shape {
+const generateRandomPolygon = (): Shape => {
     const numVertices = Math.floor(Math.random() * (8 - 3 + 1)) + 3;
     // const numVertices = 4;
     const centerX = 50 + Math.random() * 1820;
@@ -153,10 +118,48 @@ function generateRandomPolygon(): Shape {
             },
             [Infinity, Infinity, -Infinity, -Infinity], // [minX, minY, maxX, maxY]
         ),
-        hasCollision: false,
-        radius: 0,
     };
-}
+};
+
+const gameLoop = (
+    verticesNumber: number,
+    canvas: HTMLCanvasElement,
+    wasm: WasmModuleExprts,
+    shapes: Shape[],
+    shapePointers: Map<number, number>,
+): void => {
+    const { updateBroadPhase, retrieveNeighbors, getNeighborsLength, getCollisionResult, clear, memory } = wasm;
+
+    updateBroadPhase();
+
+    for (let i = 0; i < verticesNumber; i++) {
+        const neighborsPointer = retrieveNeighbors(i);
+        const neighborsLength = getNeighborsLength();
+        const neighbors = new Int32Array(memory.buffer, neighborsPointer, neighborsLength);
+
+        console.log(`Neighbors for ${i}:`, Array.from(neighbors));
+
+        for (let j = 0; j < neighborsLength; j++) {
+            const neighborId = neighbors[j];
+            if (i === neighborId) continue;
+
+            const collisionResultPointer = getCollisionResult(i, neighborId);
+            const collisionResult = new Float64Array(memory.buffer, collisionResultPointer, 3);
+
+            if (collisionResult[2] !== Infinity) {
+                shapes[i].hasCollision = true;
+                shapes[neighborId].hasCollision = true;
+                console.log(
+                    `Collision between ${i} and ${neighborId}: direction (${collisionResult[0]}, ${collisionResult[1]}), penetration: ${collisionResult[2]}`,
+                );
+            }
+        }
+    }
+
+    if (canvas) renderPolygons(canvas, shapes);
+
+    window.requestAnimationFrame(() => gameLoop(verticesNumber, canvas, wasm, shapes, shapePointers));
+};
 
 const renderPolygons = (canvas: HTMLCanvasElement, polygons: Shape[]) => {
     const ctx = canvas.getContext("2d");

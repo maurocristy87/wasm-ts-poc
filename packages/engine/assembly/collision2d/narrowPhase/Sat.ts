@@ -4,23 +4,23 @@ export class Sat {
         normalsA: Float64Array,
         verticesB: Float64Array,
         normalsB: Float64Array,
+        result: Float64Array,
     ): Float64Array {
-        const response = new Float64Array(3); // [directionX, directionY, penetration]
-        response[2] = Infinity;
+        result[2] = Infinity;
 
         for (let i = 0; i < normalsA.length; i += 2) {
-            if (!this.overlapOnAxis(verticesA, verticesB, normalsA[i], normalsA[i + 1], response)) {
-                return response;
+            if (!this.overlapOnAxis(verticesA, verticesB, normalsA[i], normalsA[i + 1], result)) {
+                return result;
             }
         }
 
         for (let i = 0; i < normalsB.length; i += 2) {
-            if (!this.overlapOnAxis(verticesA, verticesB, normalsB[i], normalsB[i + 1], response)) {
-                return response;
+            if (!this.overlapOnAxis(verticesA, verticesB, normalsB[i], normalsB[i + 1], result)) {
+                return result;
             }
         }
 
-        return response;
+        return result;
     }
 
     private overlapOnAxis(
@@ -28,7 +28,7 @@ export class Sat {
         verticesB: Float64Array,
         axisX: f64,
         axisY: f64,
-        response: Float64Array,
+        result: Float64Array,
     ): bool {
         let minA: f64 = Infinity;
         let maxA: f64 = -Infinity;
@@ -50,10 +50,10 @@ export class Sat {
         if (maxA < minB || maxB < minA) return false; // no collision
 
         const penetration = Math.min(maxA - minB, maxB - minA);
-        if (penetration < response[2]) {
-            response[0] = axisX;
-            response[1] = axisY;
-            response[2] = penetration;
+        if (penetration < result[2]) {
+            result[0] = axisX;
+            result[1] = axisY;
+            result[2] = penetration;
         }
         return true;
     }
@@ -62,9 +62,9 @@ export class Sat {
         circleData: Float64Array, // [x, y, radius]
         polygonVertices: Float64Array,
         polygonNormals: Float64Array,
+        result: Float64Array,
     ): Float64Array {
-        const response = new Float64Array(3); // [directionX, direction, penetration]
-        response[2] = Infinity;
+        result[2] = Infinity;
 
         for (let i = 0; i < polygonNormals.length; i += 2) {
             if (
@@ -73,14 +73,14 @@ export class Sat {
                     polygonVertices,
                     polygonNormals[i],
                     polygonNormals[i + 1],
-                    response,
+                    result,
                 )
             ) {
-                return response;
+                return result;
             }
         }
 
-        return response;
+        return result;
     }
 
     private overlapOnAxisCirclePolygon(
@@ -88,7 +88,7 @@ export class Sat {
         polygonVertices: Float64Array,
         axisX: f64,
         axisY: f64,
-        response: Float64Array,
+        result: Float64Array,
     ): bool {
         const circleProjection = circle[0] * axisX + circle[1] * axisY;
         const minCircle = circleProjection - circle[2];
@@ -106,10 +106,10 @@ export class Sat {
         if (maxCircle < minPolygon || maxPolygon < minCircle) return false; // no collision
 
         const penetration = Math.min(maxPolygon - minCircle, maxCircle - minPolygon);
-        if (penetration < response[2]) {
-            response[0] = axisX;
-            response[1] = axisY;
-            response[2] = penetration;
+        if (penetration < result[2]) {
+            result[0] = axisX;
+            result[1] = axisY;
+            result[2] = penetration;
         }
         return true;
     }
