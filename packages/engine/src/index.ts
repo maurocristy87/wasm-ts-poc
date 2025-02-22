@@ -1,7 +1,7 @@
 import release from "./wasm/debug.wasm";
 
 type WasmModuleExprts = {
-    insertShape(id: number, pointer: number, length: number, circumference?: boolean): void;
+    insertShape(id: number, pointer: number, length: number, circumference: number): void;
     updateBroadPhase(): void;
     retrieveNeighbors(id: number): number;
     getNeighborsLength(): number;
@@ -48,9 +48,7 @@ export async function main(rectsLength: number, canvas: HTMLCanvasElement, wasm:
         const ptr = __new(vertices.length * 8, 3); // `3` is the id for Float64Array
         new Float64Array(memory.buffer, ptr, vertices.length).set(vertices);
 
-        console.log("Inserting shape", i, ptr, vertices.length);
-
-        insertShape(i, ptr, vertices.length, false);
+        insertShape(i, ptr, vertices.length, 0);
     }
 
     return;
