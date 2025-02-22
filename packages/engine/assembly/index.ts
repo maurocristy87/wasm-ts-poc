@@ -5,6 +5,7 @@ import {
     calculateNormals,
 } from "./math/Utils";
 import { Rect } from "./math/Rect";
+import { Sat } from "./collision2d/narrowPhase/Sat";
 
 // shapes
 const shapeIds: Set<i32> = new Set<i32>();
@@ -16,10 +17,12 @@ const normals: Map<i32, Float64Array> = new Map<i32, Float64Array>();
 // broad phase
 const bounds: Rect = new Rect(0, 0, 0, 0);
 const quadtree: Quadtree = new Quadtree(bounds);
-
 let neighbors: i32[] = [];
 
-export function insertShape(id: i32, pointer: usize, length: i32, circumference: boolean = false): void {
+// narrow phase
+const sat = new Sat();
+
+export function insertShape(id: i32, pointer: usize, length: i32, circumference: bool = false): void {
     if (!boundingBoxes.has(id)) boundingBoxes.set(id, new Rect(0, 0, 0, 0));
 
     const data = Float64Array.wrap(changetype<ArrayBuffer>(pointer), 0, length);
@@ -81,4 +84,15 @@ export function retrieveNeighbors(id: i32): usize {
 
 export function getNeighborsLength(): i32 {
     return neighbors.length;
+}
+
+export function getCollisionResult(shapeId: i32, neighborId: i32): usize {
+    const result = sat.resolveForPolygons(
+        vertices.get(shapeId),
+        normals.get(shapeId),
+        vertices.get(neighborId),
+        normals.get(neighborId),
+    );
+
+    return result.dataStart;
 }

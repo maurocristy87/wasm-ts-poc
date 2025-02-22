@@ -1,10 +1,11 @@
 import release from "./wasm/debug.wasm";
 
 type WasmModuleExprts = {
-    insertShape: (id: number, verticesPtr: number, length: number) => void;
-    updateBroadPhase: () => void;
-    retrieveNeighbors: (id: number) => number;
-    getNeighborsLength: () => number;
+    insertShape(id: number, pointer: number, length: number, circumference?: boolean): void;
+    updateBroadPhase(): void;
+    retrieveNeighbors(id: number): number;
+    getNeighborsLength(): number;
+    getCollisionResult(shapeId: number, neighborId: number): number;
     memory: WebAssembly.Memory;
     __new(size: number, id: number): number;
     __pin(ptr: number): number;
@@ -27,7 +28,8 @@ export async function run(rectsLength: number, render: boolean = true) {
 }
 
 export async function main(rectsLength: number, canvas: HTMLCanvasElement, wasm: WasmModuleExprts) {
-    const { insertShape, updateBroadPhase, retrieveNeighbors, getNeighborsLength, memory } = wasm;
+    const { insertShape, updateBroadPhase, retrieveNeighbors, getNeighborsLength, getCollisionResult, memory, __new } =
+        wasm;
     const rectsToDraw: { x: number; y: number; width: number; height: number; id: number; collision: boolean }[] = [];
 
     for (let i = 0; i < rectsLength; i++) {
@@ -43,11 +45,15 @@ export async function main(rectsLength: number, canvas: HTMLCanvasElement, wasm:
         const { x, y, width, height } = rectsToDraw[i];
 
         const vertices = new Float64Array([x, y, x, y + height, x + width, y + height, x + width, y]);
-        const ptr = wasm.__new(vertices.length * 8, 3); // `3` is the id for Float64Array
-        new Float64Array(wasm.memory.buffer, ptr, vertices.length).set(vertices);
+        const ptr = __new(vertices.length * 8, 3); // `3` is the id for Float64Array
+        new Float64Array(memory.buffer, ptr, vertices.length).set(vertices);
 
-        insertShape(i, ptr, vertices.length);
+        console.log("Inserting shape", i, ptr, vertices.length);
+
+        insertShape(i, ptr, vertices.length, false);
     }
+
+    return;
 
     updateBroadPhase();
 
@@ -57,11 +63,21 @@ export async function main(rectsLength: number, canvas: HTMLCanvasElement, wasm:
         const neighbors = new Int32Array(memory.buffer, neighborsPointer, neighborsLength);
 
         rectsToDraw[i].collision = neighborsLength > 1;
+
+        for (let j = 0; j < neighborsLength; j++) {
+            const neighborId = neighbors[j];
+            const collisionResultPointer = getCollisionResult(i, neighborId);
+            const collisionResult = new Float64Array(memory.buffer, collisionResultPointer, 3);
+
+            if (collisionResult[2] !== Infinity) {
+                console.log(`Collision between ${i} and ${neighborId}:`, collisionResult);
+            }
+        }
     }
 
     if (canvas) renderRects(canvas, rectsToDraw);
 
-    window.requestAnimationFrame(() => main(rectsLength, canvas, wasm));
+    // window.requestAnimationFrame(() => main(rectsLength, canvas, wasm));
 }
 
 const loadWasm = async () => {
