@@ -19,12 +19,12 @@ const quadtree: Quadtree = new Quadtree(bounds);
 
 let neighbors: i32[] = [];
 
-export function insertShape(id: i32, pointer: usize, length: i32, circumference: boolean = false): void {
+export function insertShape(id: i32, pointer: usize, length: i32, circumference: i32): void {
     if (!boundingBoxes.has(id)) boundingBoxes.set(id, new Rect(0, 0, 0, 0));
 
     const data = Float64Array.wrap(changetype<ArrayBuffer>(pointer), 0, length);
 
-    if (circumference) {
+    if (circumference > 0) {
         calculateBoundingBoxFromCircumference(boundingBoxes.get(id), data);
         circumferences.set(id, data);
     } else {
