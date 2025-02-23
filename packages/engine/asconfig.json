@@ -17,6 +17,9 @@
         }
     },
     "options": {
-        "bindings": "esm"
+        "bindings": "esm",
+        "importMemory": true,
+        "exportRuntime": true,
+        "runtime": "incremental"
     }
 }

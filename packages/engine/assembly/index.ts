@@ -1,39 +1,28 @@
 import { Quadtree } from "./collision2d/broadPhase/QuadTree";
-import {
-    calculateBoundingBoxFromCircumference,
-    calculateBoundingBoxFromVertices,
-    calculateNormals,
-} from "./math/Utils";
+import { calculateBoundingBoxFromCircumference, calculateBoundingBoxFromVertices } from "./math/Utils";
 import { Rect } from "./math/Rect";
 
 // shapes
 const shapeIds: Set<i32> = new Set<i32>();
 const boundingBoxes: Map<i32, Rect> = new Map<i32, Rect>();
-const vertices: Map<i32, Float64Array> = new Map<i32, Float64Array>();
-const circumferences: Map<i32, Float64Array> = new Map<i32, Float64Array>(); // id -> [x, y, radius]
-const normals: Map<i32, Float64Array> = new Map<i32, Float64Array>();
 
 // broad phase
 const bounds: Rect = new Rect(0, 0, 0, 0);
 const quadtree: Quadtree = new Quadtree(bounds);
-
 let neighbors: i32[] = [];
 
 export function insertShape(id: i32, pointer: usize, length: i32, circumference: i32): void {
+    shapeIds.add(id);
+
     if (!boundingBoxes.has(id)) boundingBoxes.set(id, new Rect(0, 0, 0, 0));
 
     const data = Float64Array.wrap(changetype<ArrayBuffer>(pointer), 0, length);
 
     if (circumference > 0) {
         calculateBoundingBoxFromCircumference(boundingBoxes.get(id), data);
-        circumferences.set(id, data);
     } else {
         calculateBoundingBoxFromVertices(boundingBoxes.get(id), data);
-        vertices.set(id, data);
-        normals.set(id, calculateNormals(data));
     }
-
-    shapeIds.add(id);
 }
 
 export function updateBroadPhase(): void {
@@ -64,8 +53,6 @@ export function updateBroadPhase(): void {
         const id = ids[i];
         quadtree.insert(id, boundingBoxes.get(id));
     }
-
-    shapeIds.clear();
 }
 
 export function retrieveNeighbors(id: i32): usize {
