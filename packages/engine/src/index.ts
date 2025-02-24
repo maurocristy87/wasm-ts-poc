@@ -1,6 +1,6 @@
 import { renderShapes } from "./rendering";
 import { generateRandomPolygon, generateRandomRect, Shape } from "./shape";
-import release from "./wasm/debug.wasm";
+import release from "./wasm/release.wasm";
 
 type WasmModuleExprts = {
     insertShape(id: number, pointer: number, length: number, circumference: number): void;
@@ -9,6 +9,9 @@ type WasmModuleExprts = {
     getNeighborsLength(): number;
     memory: WebAssembly.Memory;
     __new(size: number, id: number): number;
+    __pin(ptr: number): number;
+    __unpin(ptr: number): void;
+    __collect(): void;
 };
 
 export async function run(rectsLength: number, render: boolean = true) {
@@ -22,15 +25,15 @@ export async function run(rectsLength: number, render: boolean = true) {
 
     const wasm = await loadWasm();
 
-    main(rectsLength, render && canvas, wasm);
+    main(rectsLength, render && canvas, wasm as WasmModuleExprts);
 }
 
 const loadWasm = async () => {
     const wasmBuffer = await release();
     const imports = {
         env: {
-            memory: new WebAssembly.Memory({ initial: 256, maximum: 256 }),
-            abort: () => console.error("Abort called!"),
+            memory: new WebAssembly.Memory({ initial: 255, maximum: 255 }),
+            abort: (error: any) => console.error("Abort called! Error: " + error),
         },
     };
     const instance = new WebAssembly.Instance(wasmBuffer, imports);
@@ -42,19 +45,25 @@ const main = (rectsLength: number, canvas: HTMLCanvasElement, wasm: WasmModuleEx
     const { insertShape, updateBroadPhase, retrieveNeighbors, getNeighborsLength, memory } = wasm;
     const shapes: Shape[] = [];
 
+    const maxVertices = 8;
+    const verticesPtr = wasm.__new(maxVertices * 2 * 8, 3); // 3 is the id for Float64Array
+    wasm.__pin(verticesPtr);
+
     for (let i = 0; i < rectsLength; i++) {
-        const shape = generateRandomRect();
-        // const shape = generateRandomPolygon(4, 4);
+        // const shape = generateRandomRect();
+        const shape = generateRandomPolygon(3, 8);
         shapes.push(shape);
 
         const vertices = new Float64Array(shape.vertices);
-        const ptr = wasm.__new(vertices.length * 8, 3); // 3 is the id for Float64Array
-        new Float64Array(wasm.memory.buffer, ptr, vertices.length).set(vertices);
+        new Float64Array(wasm.memory.buffer, verticesPtr, vertices.length).set(vertices);
 
-        // console.log(ptr);
-
-        insertShape(i, ptr, vertices.length, 0);
+        insertShape(i, verticesPtr, vertices.length, 0);
     }
+
+    // console.log(verticesPtr);
+
+    // free memory after inserting the shapes
+    wasm.__unpin(verticesPtr);
 
     updateBroadPhase();
 
@@ -65,6 +74,8 @@ const main = (rectsLength: number, canvas: HTMLCanvasElement, wasm: WasmModuleEx
 
         shapes[i].hasCollision = neighborsLength > 1;
     }
+
+    wasm.__collect();
 
     if (canvas) renderShapes(canvas, shapes);
 
